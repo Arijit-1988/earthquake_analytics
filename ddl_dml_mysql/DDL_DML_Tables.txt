@@ -1,0 +1,175 @@
+Dimesnion DDL & DMLS
+====================
+CREATE TABLE `contributor_dim` (
+  `contributor_key` BIGINT NOT NULL AUTO_INCREMENT,
+  `contributor` text,
+  KEY `ix_stg_contributors_index` (`contributor_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE `catalog_dim` (
+  `catalog_key` BIGINT NOT NULL AUTO_INCREMENT,
+  `catalog` text,
+  KEY `ix_stg_catalogs_index` (`catalog_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE `eventtype_dim` (
+  `eventtype_key` BIGINT NOT NULL AUTO_INCREMENT,
+  `eventtype` text,
+  KEY `ix_stg_eventtypes_index` (`eventtype_key`)
+  
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE `magnitudetype_dim` (
+  `magnitudetype_key` BIGINT NOT NULL AUTO_INCREMENT,
+  `magnitudetype` text,
+  KEY `ix_stg_magnitudetypes_index` (`magnitudetype_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE `producttype_dim` (
+  `producttype_key` BIGINT NOT NULL AUTO_INCREMENT,
+  `producttype` text,
+  KEY `ix_stg_producttypes_index` (`producttype_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+INSERT INTO contributor_dim (contributor)
+SELECT contributors FROM stg_contributors_dim;
+
+INSERT INTO catalog_dim (catalog)
+SELECT catalogs FROM stg_catalogs_dim;
+
+INSERT INTO eventtype_dim (eventtype)
+SELECT eventtypes FROM stg_eventtypes_dim;
+
+INSERT INTO magnitudetype_dim (magnitudetype)
+SELECT magnitudetypes FROM stg_magnitudetypes_dim;
+
+INSERT INTO producttype_dim (producttype)
+SELECT producttypes FROM stg_producttypes_dim;
+
+
+FACT DDL & DMLS
+===============
+
+CREATE TABLE `earthquake_fct` (
+  `Event_Key` BIGINT NOT NULL AUTO_INCREMENT,
+  `Event_Id` text,
+  `Event_DateTime` TIMESTAMP,
+  `Latitude` double DEFAULT NULL,
+  `Longitude` double DEFAULT NULL,
+  `Depth` double DEFAULT NULL,
+  `Shape` text,
+  `Alert` text,
+  `CDI` double DEFAULT NULL,
+  `Code` text,
+  `Detail` text,
+  `Dmin` double DEFAULT NULL,
+  `Felt` double DEFAULT NULL,
+  `Gap` double DEFAULT NULL,
+  `Magnitude` double DEFAULT NULL,
+  `MagType` text,
+  `Maximimum_Estimated_Intensity` double DEFAULT NULL,
+  `Data_Contributor_Id` text,
+  `Tot_Seismic_Stations` double DEFAULT NULL,
+  `Event_Location` text,
+  `RMS_Time` double DEFAULT NULL,
+  `Event_Significance` bigint(20) DEFAULT NULL,
+  `Network_Sources` text,
+  `Status` text,
+  `Title` text,
+  `Tsunami` bigint(20) DEFAULT NULL,
+  `Event_Type` text,
+  `Product_Event_Type` text,
+  `Tmz_offset_UTC` double DEFAULT NULL,
+  `Event_Latest_UpdateTime` TIMESTAMP,
+  `Link_USGS_URL` text,
+  `Type` text,
+  KEY `ix_usgs_index` (`Event_Key`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+Insert into `earthquake_fct`(`Event_Id`,`Event_DateTime`,`Latitude`,`Longitude`,`Depth`,`Shape`,`Alert`,`CDI`,`Code`,`Detail`,`Dmin`,`Felt`,`Gap`,`Magnitude`,`MagType`,`Maximimum_Estimated_Intensity`,`Data_Contributor_Id`,`Tot_Seismic_Stations`,`Event_Location`,`RMS_Time`,`Event_Significance`,`Network_Sources`,`Status`,`Title`,`Tsunami`,`Event_Type`,`Product_Event_Type`,`Tmz_offset_UTC`,`Event_Latest_UpdateTime`,`Link_USGS_URL`,`Type`)
+SELECT
+    `Id`,
+     from_unixtime(floor(`PropertiesTime`/1000)),
+    `Latitude`,
+    `Long`,
+    `Depth`,
+    `GeometryType`,
+    `PropertiesAlert`,
+    `PropertiesCDI`,
+    `PropertiesCode`,
+    `PropertiesDetail`,
+    `PropertiesDmin`,
+    `PropertiesFelt`,
+    `PropertiesGap`,
+    `PropertiesMag`,
+    `PropertiesMagType`,
+    `PropertiesMmi`,
+    `PropertiesNet`,
+    `PropertiesNst`,
+    `PropertiesPlace`,
+    `PropertiesRms`,
+    `PropertiesSig`,
+    `PropertiesSources`,
+    `PropertiesStatus`,
+    `PropertiesTitle`,
+    `PropertiesTsunami`,
+    `PropertiesType`,
+    `PropertiesTypes`,
+    `PropertiesTz`,
+     from_unixtime(floor(`PropertiesUpdated`/1000)),
+    `PropertiesUrl`,
+    `stg_earthquake_fct`.`Type`
+    FROM `usgs`.`stg_earthquake_fct`;
+
+    
+ Agg DDL & DMLS
+========================== 
+
+CREATE TABLE `earthquake_agg` (
+  `Event_Key` BIGINT NOT NULL AUTO_INCREMENT,
+  `Event_Id` text,
+  `Event_DateTime` TIMESTAMP,
+  `EventType_Key` BIGINT,
+  `Latitude` double DEFAULT NULL,
+  `Longitude` double DEFAULT NULL,
+  `Depth` double DEFAULT NULL,
+  `Magnitude` double DEFAULT NULL,
+  `MagType_Key` BIGINT,
+  `Tot_Seismic_Stations` double DEFAULT NULL,
+  `Event_Location` text,
+  `RMS_Time` double DEFAULT NULL,
+  `Event_Significance` bigint(20) DEFAULT NULL,
+  `Network_Sources` text,
+  `Status` text,
+  `Title` text,
+  `Tsunami` bigint(20) DEFAULT NULL,
+  `Event_Latest_UpdateTime` TIMESTAMP,
+  KEY `ax_usgs_index` (`Event_Key`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+
+INSERT INTO `earthquake_agg`
+SELECT 
+`Event_Key`,
+`Event_Id`,
+`Event_DateTime`,
+C.`Eventtype_key`,
+`Latitude`,
+`Longitude`,
+`Depth`,
+`Magnitude`,
+B.`Magnitudetype_key`,
+`Tot_Seismic_Stations`,
+`Event_Location`,
+`RMS_Time`,
+`Event_Significance`,
+`Network_Sources`,
+`Status`,
+`Title`,
+`Tsunami`,
+`Event_Latest_UpdateTime`
+FROM `earthquake_fct` A
+INNER JOIN magnitudetype_dim B
+ON A.MagType = B.magnitudetype
+INNER JOIN eventtype_dim C
+ON A.Event_Type = C.eventtype
